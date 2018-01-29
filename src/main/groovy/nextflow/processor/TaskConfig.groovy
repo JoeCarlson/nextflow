@@ -77,7 +77,7 @@ class TaskConfig implements Map {
             echo = false
             undef = false
             cacheable = true
-            shell = ['/bin/bash','-ue']
+            shell = ['/bin/bash','-uel']
             validExitStatus = [0]
             inputs = new InputsList()
             outputs = new OutputsList()
