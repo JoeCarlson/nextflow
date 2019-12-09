@@ -114,6 +114,7 @@ class GridTaskHandler extends TaskHandler {
         String result = null
         def exitStatus = Integer.MAX_VALUE
         ProcessBuilder builder = null
+        log.debug "Using modified submitter...\n"
         try {
             // -- create the wrapper script
             executor.createBashWrapperBuilder(task).build()
@@ -123,20 +124,34 @@ class GridTaskHandler extends TaskHandler {
             final process = builder.start()
 
             try {
+
+                def attempts = 0;
+                def success = 0;
+
                 // -- forward the job launcher script to the command stdin if required
-                if( executor.pipeLauncherScript() ) {
-                    process.out << wrapperFile.text
-                    process.out.close()
-                }
+                while (success == 0) {
+                    if (executor.pipeLauncherScript()) {
+                        process.out << wrapperFile.text
+                        process.out.close()
+                    }
 
-                // -- wait the the process completes
-                result = process.text
-                exitStatus = process.waitFor()
+                    // -- wait the the process completes
+                    result = process.text
+                    exitStatus = process.waitFor()
+                    success = 1;
+                    attempts++;
 
-                if( exitStatus ) {
-                    log.debug "Failed to submit process ${task.name} > exit: $exitStatus; workDir: $task.workDir\n$result\n"
-                    throw new ProcessSubmitException("Failed to submit process to grid scheduler for execution")
-                }
+                    if (exitStatus) {
+                        log.debug "Failed to submit process ${task.name} > exit: $exitStatus; workDir: $task.workDir\n$result\n"
+                        success = 0;
+                        if (attempts > 10) {
+                            throw new ProcessSubmitException("Failed to submit process to grid scheduler for execution")
+                        } else {
+                            log.debug "Failed to submit process ${task.name} > exit: $exitStatus; workDir: $task.workDir\n$result\nRetrying...\n"
+                            sleep(1000);
+                        }
+                    }
+            }
 
                 // save the JobId in the
                 this.jobId = executor.parseJobId(result)
